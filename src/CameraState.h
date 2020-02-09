@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 
 struct CameraState{
+    CameraState() {};
     CameraState(Eigen::Vector3d _position, Eigen::Quaterniond _orientation):
             position(_position), orientation(_orientation) {};
     Eigen::Vector3d position;

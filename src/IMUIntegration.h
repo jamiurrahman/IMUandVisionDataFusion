@@ -84,6 +84,8 @@ private:
     };
 
     float deltaTime;
+    Eigen::Vector3d correctedVel;
+    CameraState savedNextState;
 
     std::list<ImuStep> uncorrectedImuSteps; //orderd list of ImuSteps after the last path position
     std::list<PathState> path; //ordered list of corrected camera states

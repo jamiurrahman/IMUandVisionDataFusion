@@ -2,6 +2,7 @@
 
 
 IMUIntegration::IMUIntegration(float framerate) : IMUIntegration(framerate, CameraState(Eigen::Vector3d(0, 0, 0), Eigen::Quaterniond::Identity())) {}
+
 IMUIntegration::IMUIntegration(float framerate, CameraState initalPathState) : path {} {
     path.push_back(PathState(0, initalPathState, Eigen::Vector3d(0,0,0)));
     deltaTime = 1/framerate;
@@ -76,18 +77,32 @@ CameraState IMUIntegration::getNextCameraState(){
     auto euler = newOrientation.toRotationMatrix().eulerAngles(0, 1, 2);
     std::cout << euler << std::endl << std::endl;
 
-    Eigen::Vector3d newPosition = lastPathStep.cameraState.position + lastPathStep.velocity + newOrientation * imuStep.acceleration / 2.0;
+    Eigen::Vector3d gravity(0.0,0.0,0.0);
 
+    Eigen::Vector3d newPosition = lastPathStep.cameraState.position + lastPathStep.velocity + (newOrientation * imuStep.acceleration + gravity) * deltaTime/ 2.0 ;
 
-    return CameraState(newPosition, newOrientation);
+    correctedVel = lastPathStep.velocity + newOrientation * imuStep.acceleration * deltaTime;
+
+    savedNextState = CameraState(newPosition, newOrientation);
+    return savedNextState;
 }
 
 void IMUIntegration::correctCameraState(CameraState cameraState) {
     PathState& lastPathStep = path.back();
 
-    Eigen::Vector3d correctedVelocity = 2 * cameraState.position - 2 * lastPathStep.cameraState.position - lastPathStep.velocity;
+//    Eigen::Vector3d correctedVelocity = correctedVel;
 
-    path.push_back(PathState(lastPathStep.frame + 1, cameraState, correctedVelocity));
+    if ((cameraState.position - savedNextState.position).norm() > 5.0){
+        path.push_back(PathState(lastPathStep.frame + 1, savedNextState, correctedVel));
+        std::cout << "Updated position too different, only using IMU data" << std::endl;
+    } else {
+        Eigen::Vector3d correctedVelocity = correctedVel;// * 0.9 + (2 * cameraState.position - 2 * lastPathStep.cameraState.position - lastPathStep.velocity) * 0.1;
+        CameraState newState(cameraState.position * 0.1 + savedNextState.position * 0.9,
+                             cameraState.orientation.slerp(0.1, savedNextState.orientation));
+
+        path.push_back(PathState(lastPathStep.frame + 1, newState, correctedVelocity));
+    }
+
     uncorrectedImuSteps.pop_front();
 }
 
